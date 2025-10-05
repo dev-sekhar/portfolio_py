@@ -1,0 +1,34 @@
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Python virtual environment (if you are using a virtual environment)
+venv/
+.env/
+env/
+
+# IDE or Editor specific files (e.g., VS Code, PyCharm, etc.)
+.vscode/
+.idea/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# System files (e.g., macOS or Windows system files)
+.DS_Store
+Thumbs.db
+
+# CSV files that are data-specific
+*.csv
+
+# .env file for storing sensitive environment variables
+.env
+
+# Any additional files that shouldn't be committed
+portfolio.db
