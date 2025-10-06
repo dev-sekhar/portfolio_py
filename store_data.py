@@ -88,6 +88,7 @@ def store_stock_data_mysql(stock_data, ticker_symbol, exchange, host, database, 
         connection.commit()
         print("✅ 'stock_prices' table ensured.")
 
+        # Ensure composite primary key (ticker_id, date)
         cursor.execute(
             "SHOW INDEX FROM stock_prices WHERE Key_name = 'PRIMARY'")
         primary_index_info = cursor.fetchall()

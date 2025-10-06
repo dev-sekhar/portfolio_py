@@ -2,3 +2,4 @@ yfinance
 mysql-connector-python
 matplotlib
 pandas
+python-dotenv
