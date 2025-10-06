@@ -1,6 +1,7 @@
 name: Daily Portfolio Data Fetch
 
 on:
+    workflow_dispatch:
     schedule:
         - cron: "0 0 * * *" # Run daily at midnight UTC; adjust as needed
 
