@@ -45,3 +45,12 @@ def display_dividends(dividends, ticker_symbol):
         plt.close()
     else:
         print(f"No dividend data to display for {ticker_symbol}.")
+
+
+def display_splits(splits_series, ticker_symbol):
+    if splits_series.empty:
+        print(f"No split data found for ticker {ticker_symbol}.")
+        return
+    print(f"Stock Split History for {ticker_symbol}:")
+    for split_date, split_ratio in splits_series.items():
+        print(f" - {split_date.date()}: Split ratio {split_ratio}")
