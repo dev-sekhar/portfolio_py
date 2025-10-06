@@ -32,3 +32,6 @@ Thumbs.db
 
 # Any additional files that shouldn't be committed
 portfolio.db
+
+
+actions-runner/

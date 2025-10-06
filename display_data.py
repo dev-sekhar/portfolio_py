@@ -20,3 +20,28 @@ def display_data(stock_data, ticker_symbol, num_days, interval):
     plt.show(block=False)
     plt.pause(5)
     plt.close()
+
+
+def display_dividends(dividends, ticker_symbol):
+    print(f"Dividends data contains {len(dividends)} records.")
+    if not dividends.empty:
+        print(
+            f"Date range: {dividends.index.min()} to {dividends.index.max()}")
+        print(dividends.head())
+
+        ax = dividends.plot(
+            kind='bar',
+            title=f"{ticker_symbol} Dividend Payments",
+            figsize=(10, 5),
+            legend=False)
+
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Dividend Amount")
+
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show(block=False)
+        plt.pause(5)
+        plt.close()
+    else:
+        print(f"No dividend data to display for {ticker_symbol}.")
