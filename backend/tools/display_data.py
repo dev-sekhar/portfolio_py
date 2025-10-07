@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import pandas as pd  # <-- Added this import for display_financials
 
 
 def display_data(stock_data, ticker_symbol, num_days, interval):
@@ -54,3 +55,38 @@ def display_splits(splits_series, ticker_symbol):
     print(f"Stock Split History for {ticker_symbol}:")
     for split_date, split_ratio in splits_series.items():
         print(f" - {split_date.date()}: Split ratio {split_ratio}")
+
+
+def display_financials(financials_data: dict, ticker_symbol: str):
+    """
+    Prints the quarterly financial statements to the terminal.
+    """
+    print(f"\n--- Quarterly Financials for {ticker_symbol} ---")
+
+    for statement_name, df in financials_data.items():
+        print(f"\n--- {statement_name.replace('_', ' ').title()} ---")
+        if df is None or df.empty:
+            print(f"No data available for {statement_name}.")
+            continue
+
+        # Transpose for better terminal readability (dates as columns)
+        df_transposed = df.T
+
+        # Format the numbers (e.g., in millions or billions for readability)
+        # Assuming values are typically large integers/floats
+        def format_value(x):
+            if pd.isna(x):
+                return ''
+            # Use 'B' for billions, 'M' for millions
+            if abs(x) >= 1_000_000_000:
+                return f'{x / 1_000_000_000:,.2f}B'
+            elif abs(x) >= 1_000_000:
+                return f'{x / 1_000_000:,.2f}M'
+            return f'{x:,.0f}'
+
+        # Apply formatting to all non-index columns
+        for col in df_transposed.columns:
+            df_transposed[col] = df_transposed[col].apply(format_value)
+
+        # Print the transposed, formatted DataFrame
+        print(df_transposed)

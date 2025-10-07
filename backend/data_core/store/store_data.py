@@ -1,6 +1,6 @@
 import pandas as pd
 from mysql.connector import Error
-from db_connection import get_db_connection
+from ..db_connection import get_db_connection
 
 
 def index_exists(cursor, table_name, index_name):

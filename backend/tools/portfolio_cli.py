@@ -1,11 +1,13 @@
 import argparse
 from dotenv import load_dotenv
 import yfinance as yf
-from fetch_price_data import fetch_stock_data
-from fetch_dividend_data import fetch_dividend_data
-from fetch_splits_data import fetch_split_data
-from display_data import display_data, display_dividends, display_splits
-from store_data import store_stock_data_mysql, store_corporate_actions_mysql
+# Corrected Imports for the new structure:
+from ..data_core.fetch.fetch_price_data import fetch_stock_data
+from ..data_core.fetch.fetch_dividend_data import fetch_dividend_data
+from ..data_core.fetch.fetch_splits_data import fetch_split_data
+from ..data_core.fetch.fetch_financials_data import fetch_quarterly_financials
+from .display_data import display_data, display_dividends, display_splits, display_financials
+from ..data_core.store.store_data import store_stock_data_mysql, store_corporate_actions_mysql, store_financials_mysql
 
 
 load_dotenv()  # Load environment variables from .env file
@@ -20,7 +22,7 @@ def get_args_or_prompt():
     parser.add_argument(
         '--interval', choices=['1d', '1wk', '1mo'], help='Data interval')
     parser.add_argument(
-        '--data-type', choices=['price', 'dividend', 'split', 'all'], help="Choose data type: 'price', 'dividend', 'split', or 'all'")
+        '--data-type', choices=['price', 'dividend', 'split', 'financials', 'all'], help="Choose data type: 'price', 'dividend', 'split', 'financials', or 'all'")
 
     args = parser.parse_args()
 
@@ -30,19 +32,20 @@ def get_args_or_prompt():
 
     if not args.data_type:
         data_type_map = {"1": "price",
-                         "2": "dividend", "3": "split", "4": "all"}
+                         "2": "dividend", "3": "split", "4": "financials", "5": "all"}
         while True:
             print("Choose data type to fetch:")
             print("1: Price")
             print("2: Dividend")
             print("3: Split")
-            print("4: All")
-            choice = input("Enter 1, 2, 3, or 4: ").strip()
+            print("4: Quarterly Financials (Income, Balance Sheet, Cash Flow)")
+            print("5: All")
+            choice = input("Enter 1, 2, 3, 4, or 5: ").strip()
             if choice in data_type_map:
                 args.data_type = data_type_map[choice]
                 break
             else:
-                print("Please enter 1, 2, 3, or 4.")
+                print("Please enter 1, 2, 3, 4, or 5.")
 
     if args.data_type in ('price', 'all'):
         if not args.days:
@@ -70,14 +73,20 @@ def get_args_or_prompt():
 
 
 def main():
-    print("Starting portfolio.py")
+    print("Starting portfolio_cli.py")
     args = get_args_or_prompt()
 
     ticker = args.ticker.upper()
     data_type = args.data_type
 
-    ticker_obj = yf.Ticker(ticker)
-    exchange = ticker_obj.info.get('exchange', 'Unknown')
+    # Use a try/except for ticker_obj.info access in case of bad ticker
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        exchange = ticker_obj.info.get('exchange', 'Unknown')
+    except Exception:
+        print(
+            f"Error: Could not retrieve info for ticker {ticker}. Check symbol and try again.")
+        return
 
     # Fetch price data if requested or if 'all' selected
     if data_type in ('price', 'all'):
@@ -117,6 +126,19 @@ def main():
             display_splits(splits, ticker)
             store_corporate_actions_mysql(
                 splits, ticker, exchange, action_type='split')
+
+    # Fetch financials data if requested or if 'all' selected
+    if data_type in ('financials', 'all'):
+        print(f"Processing ticker {ticker} for quarterly financials.")
+
+        financials_data = fetch_quarterly_financials(ticker)
+
+        # Check if any statement has data
+        if not any(not df.empty for df in financials_data.values()):
+            print(f"No quarterly financials found for ticker {ticker}.")
+        else:
+            display_financials(financials_data, ticker)
+            store_financials_mysql(financials_data, ticker)
 
 
 if __name__ == "__main__":
