@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package financial_data;
+
+// Represents a single data point for a financial statement item
+message DataItem {
+  // e.g., "IS_NetIncome", "BS_TotalAssets", "CF_FreeCashFlow"
+  string item_key = 1; 
+  
+  // The value of the financial metric. Using sint64 (signed integer) 
+  // is efficient for large numbers like revenue/assets, assuming values 
+  // are typically reported in whole numbers (e.g., in thousands or millions).
+  sint64 value = 2;
+}
+
+// Represents a complete quarterly report (a collection of DataItems for one date)
+message QuarterlyReport {
+  // Date is sent as a string (YYYY-MM-DD) for simplicity and readability
+  string report_date = 1; 
+  
+  // A map of item key to its value (alternative to the repeated DataItem message)
+  // This structure is often cleaner for key/value pairs like financial statements.
+  map<string, sint64> data_items = 2;
+}
+
+// The top-level message for the entire ticker export
+message TickerFinancialsExport {
+  string ticker_symbol = 1;
+  string export_timestamp = 2;
+  
+  // A list of all quarterly reports
+  repeated QuarterlyReport reports = 3;
+}

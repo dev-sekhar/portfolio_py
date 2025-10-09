@@ -1,1 +1,4 @@
 # Add pricing service requirements here
+fastapi
+uvicorn
+python-dotenv

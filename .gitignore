@@ -32,9 +32,12 @@ Thumbs.db
 
 # Any additional files that shouldn't be committed
 portfolio.db
-
-
 actions-runner/
 
-
 restructure.py
+
+setup_frontend.py
+
+# Auto-generated files
+*_pb2.py
+backend/data_core/backend/

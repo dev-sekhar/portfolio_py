@@ -86,7 +86,7 @@ def store_stock_data_mysql(stock_data, ticker_symbol, exchange):
                 last_modified=CURRENT_TIMESTAMP, exchange=VALUES(exchange)
         """
 
-        print(f"📊 Inserting/updating {len(stock_data)} stock price records...")
+        print(f"[INFO] Inserting/updating {len(stock_data)} stock price records...")
         for idx, row in stock_data.iterrows():
             record_date = idx.date() if hasattr(idx, 'date') else idx
             data_tuple = (
@@ -257,13 +257,12 @@ def store_financials_mysql(financials_data: dict, ticker_symbol: str):
                        (ticker_symbol,))
         row = cursor.fetchone()
         if not row:
-            # Need to create the ticker entry if it doesn't exist.
-            # Assuming exchange is not needed for this check, but would be good practice
-            # to pass it through from portfolio.py if possible.
-            print(
-                f"⚠️ Ticker {ticker_symbol} not found in database. Please run price fetch first or update 'exchange' logic.")
-            return
-        ticker_id = row[0]
+            # If ticker doesn't exist, create it. Exchange is not critical here.
+            cursor.execute(
+                "INSERT INTO tickers (symbol, exchange) VALUES (%s, %s)", (ticker_symbol, 'Unknown'))
+            ticker_id = cursor.lastrowid
+        else:
+            ticker_id = row[0]
         connection.commit()
 
         # 2. Define table structures for financials
@@ -344,5 +343,53 @@ def store_financials_mysql(financials_data: dict, ticker_symbol: str):
             cursor.close()
             connection.close()
             print("🔒 MySQL connection closed for financials.")
+
+
+def ensure_client_usage_table(connection):
+    """
+    Ensures the client_usage table exists in the database.
+    This table holds client API keys, their tier, and their current usage counts.
+    """
+    try:
+        cursor = connection.cursor()
+
+        # NOTE: This is the table for the Pricing Service
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS client_usage (
+                client_key VARCHAR(64) PRIMARY KEY NOT NULL,
+                client_name VARCHAR(128) NOT NULL,
+                tier VARCHAR(32) NOT NULL,
+                daily_limit INT NOT NULL,
+                monthly_limit INT NOT NULL,
+                current_daily_usage INT DEFAULT 0,
+                current_monthly_usage INT DEFAULT 0,
+                last_reset_date DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Insert initial mock data if the table is empty for development
+        mock_clients = [
+            ("CLIENT_KEY_ALPHA", "Alpha Research Partners", "Premium", 5000, 100000),
+            ("CLIENT_KEY_BETA", "Beta Quant", "Basic", 500, 10000),
+            ("CLIENT_KEY_FREE", "Free Trial User", "Free", 10, 300),
+        ]
+
+        for key, name, tier, daily, monthly in mock_clients:
+            # Only insert if the key does not exist
+            insert_query = """
+                INSERT IGNORE INTO client_usage 
+                (client_key, client_name, tier, daily_limit, monthly_limit)
+                VALUES (%s, %s, %s, %s, %s)
+            """
+            cursor.execute(insert_query, (key, name, tier, daily, monthly))
+
+        connection.commit()
+        print("✅ Client usage table ensured and mock clients inserted.")
+
+    except Error as e:
+        print(f"❌ MySQL Error ensuring client_usage table: {e}")
+
+
 
 # --- END OF UPDATE store_data.py ---

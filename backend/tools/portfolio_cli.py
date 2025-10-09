@@ -72,41 +72,46 @@ def get_args_or_prompt():
     return args
 
 
-def main():
-    print("Starting portfolio_cli.py")
-    args = get_args_or_prompt()
-
-    ticker = args.ticker.upper()
-    data_type = args.data_type
-
-    # Use a try/except for ticker_obj.info access in case of bad ticker
+def ingest_ticker_data(ticker, data_type, days=None, interval=None):
+    """
+    Fetches and stores data for a given ticker based on the specified data_type.
+    Returns True on success, False on failure.
+    """
     try:
         ticker_obj = yf.Ticker(ticker)
-        exchange = ticker_obj.info.get('exchange', 'Unknown')
-    except Exception:
-        print(
-            f"Error: Could not retrieve info for ticker {ticker}. Check symbol and try again.")
-        return
-
-    # Fetch price data if requested or if 'all' selected
-    if data_type in ('price', 'all'):
-        days = args.days
-        interval = args.interval
-        print(
-            f"Processing ticker {ticker} for last {days} days with interval {interval} (Price data).")
-
-        stock_data = fetch_stock_data(ticker, days, interval)
-        if stock_data.empty:
+        # .info can be empty for invalid tickers, so we check a non-optional key
+        if 'symbol' not in ticker_obj.info:
             print(
-                f"No price data returned for ticker {ticker}. Check symbol and try again.")
-        else:
-            display_data(stock_data, ticker, days, interval)
-            store_stock_data_mysql(stock_data, ticker, exchange)
+                f"Error: Invalid or delisted ticker: {ticker}. No data found.")
+            return False
+        exchange = ticker_obj.info.get('exchange', 'Unknown')
+    except Exception as e:
+        print(
+            f"Error: Could not retrieve info for ticker {ticker}. Exception: {e}")
+        return False
 
-    # Fetch dividend data if requested or if 'all' selected
+    success = True  # Assume success, set to False on any failure
+
+    # Fetch price data
+    if data_type in ('price', 'all'):
+        if not days or not interval:
+            print("Error: 'days' and 'interval' are required for price data.")
+            success = False
+        else:
+            print(
+                f"Processing ticker {ticker} for last {days} days with interval {interval} (Price data).")
+            stock_data = fetch_stock_data(ticker, days, interval)
+            if stock_data.empty:
+                print(
+                    f"No price data returned for ticker {ticker}. Check symbol and try again.")
+                success = False
+            else:
+                display_data(stock_data, ticker, days, interval)
+                store_stock_data_mysql(stock_data, ticker, exchange)
+
+    # Fetch dividend data
     if data_type in ('dividend', 'all'):
         print(f"Processing ticker {ticker} for dividend history.")
-
         dividends = fetch_dividend_data(ticker)
         if dividends.empty:
             print(f"No dividend data found for ticker {ticker}.")
@@ -115,10 +120,9 @@ def main():
             store_corporate_actions_mysql(
                 dividends, ticker, exchange, action_type='dividend')
 
-    # Fetch split data if requested or if 'all' selected
+    # Fetch split data
     if data_type in ('split', 'all'):
         print(f"Processing ticker {ticker} for split history.")
-
         splits = fetch_split_data(ticker)
         if splits.empty:
             print(f"No split data found for ticker {ticker}.")
@@ -127,18 +131,29 @@ def main():
             store_corporate_actions_mysql(
                 splits, ticker, exchange, action_type='split')
 
-    # Fetch financials data if requested or if 'all' selected
+    # Fetch financials data
     if data_type in ('financials', 'all'):
         print(f"Processing ticker {ticker} for quarterly financials.")
-
         financials_data = fetch_quarterly_financials(ticker)
-
-        # Check if any statement has data
         if not any(not df.empty for df in financials_data.values()):
             print(f"No quarterly financials found for ticker {ticker}.")
+            # This is not necessarily a failure, could be a new company.
+            # We won't set success = False here.
         else:
             display_financials(financials_data, ticker)
             store_financials_mysql(financials_data, ticker)
+
+    return success
+
+
+def main():
+    print("Starting portfolio_cli.py")
+    args = get_args_or_prompt()
+
+    ticker = args.ticker.upper()
+    
+    ingest_ticker_data(ticker, args.data_type, args.days, args.interval)
+
 
 
 if __name__ == "__main__":
