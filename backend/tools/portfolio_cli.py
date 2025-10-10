@@ -22,7 +22,7 @@ def get_args_or_prompt():
     parser.add_argument(
         '--interval', choices=['1d', '1wk', '1mo'], help='Data interval')
     parser.add_argument(
-        '--data-type', choices=['price', 'dividend', 'split', 'financials', 'all'], help="Choose data type: 'price', 'dividend', 'split', 'financials', or 'all'")
+        '--data-type', choices=['price', 'dividend', 'split', 'financials', 'news', 'all'], help="Choose data type: 'price', 'dividend', 'split', 'financials', 'news', or 'all'")
 
     args = parser.parse_args()
 
@@ -32,20 +32,21 @@ def get_args_or_prompt():
 
     if not args.data_type:
         data_type_map = {"1": "price",
-                         "2": "dividend", "3": "split", "4": "financials", "5": "all"}
+                         "2": "dividend", "3": "split", "4": "financials", "5": "news", "6": "all"}
         while True:
             print("Choose data type to fetch:")
             print("1: Price")
             print("2: Dividend")
             print("3: Split")
             print("4: Quarterly Financials (Income, Balance Sheet, Cash Flow)")
-            print("5: All")
-            choice = input("Enter 1, 2, 3, 4, or 5: ").strip()
+            print("5: News")
+            print("6: All")
+            choice = input("Enter 1, 2, 3, 4, 5, or 6: ").strip()
             if choice in data_type_map:
                 args.data_type = data_type_map[choice]
                 break
             else:
-                print("Please enter 1, 2, 3, 4, or 5.")
+                print("Please enter 1, 2, 3, 4, 5, or 6.")
 
     if args.data_type in ('price', 'all'):
         if not args.days:
@@ -143,7 +144,12 @@ def ingest_ticker_data(ticker, data_type, days=None, interval=None):
             display_financials(financials_data, ticker)
             store_financials_mysql(financials_data, ticker)
 
-    return success
+    # Fetch news data
+    if data_type in ('news', 'all'):
+        print(f"Processing ticker {ticker} for news.")
+        news_tool = StockNewsTool()
+        news = news_tool._run(ticker)
+        print(news)
 
 
 def main():
