@@ -8,6 +8,7 @@ from ..data_core.fetch.fetch_splits_data import fetch_split_data
 from ..data_core.fetch.fetch_financials_data import fetch_quarterly_financials
 from .display_data import display_data, display_dividends, display_splits, display_financials
 from ..data_core.store.store_data import store_stock_data_mysql, store_corporate_actions_mysql, store_financials_mysql
+from .stock_news_tool import StockNewsTool
 
 
 load_dotenv()  # Load environment variables from .env file

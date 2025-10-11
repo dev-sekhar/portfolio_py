@@ -11,8 +11,14 @@ class StockNewsTool(BaseTool):
             ticker = yf.Ticker(symbol)
             news_items = ticker.news
             if news_items:
-                headlines = [f"- {item['title']}" for item in news_items]
-                return f"Latest news for {symbol}:\n" + "\n".join(headlines)
+                headlines = []
+                for item in news_items:
+                    if 'content' in item and 'title' in item['content']:
+                        headlines.append(f"- {item['content']['title']}")
+                if headlines:
+                    return f"Latest news for {symbol}:\n" + "\n".join(headlines)
+                else:
+                    return f"No news with titles found for {symbol}."
             else:
                 return f"Could not retrieve news for {symbol}."
         except Exception as e:
