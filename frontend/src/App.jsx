@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import "./App.css";
 import FinancialTable from "./components/FinancialTable";
 import PriceTable from "./components/PriceTable"; // Import the new component
-import { fetchFinancialData, fetchPriceHistory } from "./api/financialsApi";
+import CorporateActionsTable from "./components/CorporateActionsTable";
+import NewsTable from "./components/NewsTable";
+import { fetchFinancialData, fetchPriceHistory, fetchCorporateActions, fetchStockNews } from "./api/financialsApi";
 
 // --- CONFIGURATION ---
 // IMPORTANT: This key is for demonstration only. In production, this would be managed by a login system.
@@ -18,6 +20,9 @@ function App() {
   const [balanceData, setBalanceData] = useState(null);
   const [cashData, setCashData] = useState(null);
   const [priceData, setPriceData] = useState(null);
+  const [dividendsData, setDividendsData] = useState(null);
+  const [splitsData, setSplitsData] = useState(null);
+  const [newsData, setNewsData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -30,6 +35,9 @@ function App() {
     setBalanceData(null);
     setCashData(null);
     setPriceData(null);
+    setDividendsData(null);
+    setSplitsData(null);
+    setNewsData(null);
 
     try {
       if (dataType === "financials" || dataType === "all") {
@@ -51,6 +59,20 @@ function App() {
       if (dataType === "price" || dataType === "all") {
         const price = await fetchPriceHistory(ticker, CLIENT_API_KEY, days);
         setPriceData(price);
+      }
+
+      if (dataType === "corporate_actions" || dataType === "all") {
+        const [dividends, splits] = await Promise.all([
+          fetchCorporateActions(ticker, "dividends", CLIENT_API_KEY),
+          fetchCorporateActions(ticker, "splits", CLIENT_API_KEY),
+        ]);
+        setDividendsData(dividends);
+        setSplitsData(splits);
+      }
+
+      if (dataType === "news" || dataType === "all") {
+        const news = await fetchStockNews(ticker, CLIENT_API_KEY);
+        setNewsData(news);
       }
     } catch (err) {
       setError(err.message);
@@ -95,6 +117,8 @@ function App() {
               <option value="all">All</option>
               <option value="financials">Financials</option>
               <option value="price">Price</option>
+              <option value="corporate_actions">Corporate Actions</option>
+              <option value="news">News</option>
             </select>
           </label>
           <button
@@ -124,7 +148,7 @@ function App() {
               min="1"
               max="12"
               style={{ marginLeft: "10px", padding: "5px", width: "60px" }}
-              disabled={dataType === "price"}
+              disabled={dataType === "price" || dataType === "corporate_actions" || dataType === "news"}
             />
           </label>
           <label>
@@ -138,7 +162,7 @@ function App() {
               min="1"
               max="7300"
               style={{ marginLeft: "10px", padding: "5px", width: "80px" }}
-              disabled={dataType === "financials"}
+              disabled={dataType === "financials" || dataType === "corporate_actions" || dataType === "news"}
             />
           </label>
         </div>
@@ -165,9 +189,24 @@ function App() {
           marginTop: "40px",
         }}
       >
+        {newsData && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <NewsTable newsData={newsData} />
+          </div>
+        )}
         {priceData && (
           <div style={{ gridColumn: "1 / -1" }}>
             <PriceTable data={priceData} title="Price Data" />
+          </div>
+        )}
+        {dividendsData && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <CorporateActionsTable data={dividendsData} title="Dividends" />
+          </div>
+        )}
+        {splitsData && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <CorporateActionsTable data={splitsData} title="Splits" />
           </div>
         )}
         {incomeData && (

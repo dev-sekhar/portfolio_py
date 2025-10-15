@@ -7,7 +7,7 @@ from ..data_core.fetch.fetch_dividend_data import fetch_dividend_data
 from ..data_core.fetch.fetch_splits_data import fetch_split_data
 from ..data_core.fetch.fetch_financials_data import fetch_quarterly_financials
 from .display_data import display_data, display_dividends, display_splits, display_financials
-from ..data_core.store.store_data import store_stock_data_mysql, store_corporate_actions_mysql, store_financials_mysql
+from ..data_core.store.store_data import store_stock_data_mysql, store_corporate_actions_mysql, store_financials_mysql, store_stock_news_mysql
 from .stock_news_tool import StockNewsTool
 
 
@@ -150,7 +150,17 @@ def ingest_ticker_data(ticker, data_type, days=None, interval=None):
         print(f"Processing ticker {ticker} for news.")
         news_tool = StockNewsTool()
         news = news_tool._run(ticker)
-        print(news)
+        if news:
+            store_stock_news_mysql(news, ticker)
+            print(f"Latest news for {ticker}:\n")
+            for item in news:
+                content = item.get('content', {})
+                print(f"- {content.get('title', 'No title')}")
+        else:
+            print(f"No news found for {ticker}.")
+
+
+    return success
 
 
 def main():

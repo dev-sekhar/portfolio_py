@@ -10,7 +10,7 @@ from typing import Annotated, Any
 from ..tools.portfolio_cli import ingest_ticker_data
 
 # Import Data Access Layer
-from ..data_core.data_access import fetch_ticker_id, fetch_financial_statement, fetch_latest_price, fetch_price_history
+from ..data_core.data_access import fetch_ticker_id, fetch_financial_statement, fetch_latest_price, fetch_price_history, fetch_corporate_actions, fetch_stock_news
 
 load_dotenv()
 # The Master API Key from the environment file
@@ -70,24 +70,45 @@ def get_ticker_id(symbol: str) -> int:
 
     ticker_id = fetch_ticker_id(symbol.upper())
     if ticker_id is None:
-        # If ticker not found, try to ingest it.
-        ingestion_success = ingest_ticker_data(
-            symbol.upper(), 'all', days=365, interval='1d')
-
-        # If ingestion fails, we can't proceed.
-        if not ingestion_success:
+        # If ticker not found, try to ingest basic ticker info first
+        from ..data_core.store.store_data import store_stock_data_mysql
+        from ..data_core.db_connection import get_db_connection
+        import yfinance as yf
+        
+        try:
+            ticker_obj = yf.Ticker(symbol.upper())
+            info = ticker_obj.info
+            if 'symbol' in info:
+                # Add ticker to database
+                connection = get_db_connection()
+                if connection:
+                    cursor = connection.cursor()
+                    cursor.execute(
+                        "INSERT IGNORE INTO tickers (symbol, exchange) VALUES (%s, %s)", 
+                        (symbol.upper(), info.get('exchange', 'Unknown'))
+                    )
+                    connection.commit()
+                    cursor.close()
+                    connection.close()
+                    
+                    # Get the ticker_id
+                    ticker_id = fetch_ticker_id(symbol.upper())
+        except Exception as e:
+            print(f"Error adding ticker {symbol}: {e}")
+            
+        if ticker_id is None:
+            # Last resort: try basic ingestion
+            try:
+                success = ingest_ticker_data(symbol.upper(), 'price', days=1, interval='1d')
+                if success:
+                    ticker_id = fetch_ticker_id(symbol.upper())
+            except:
+                pass
+                
+        if ticker_id is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Ticker '{symbol.upper()}' not found and could not be ingested. Please check the symbol."
-            )
-
-        # Try fetching the ID again after successful ingestion.
-        ticker_id = fetch_ticker_id(symbol.upper())
-        if ticker_id is None:
-            # This case is unlikely if ingestion was successful, but good to have.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ticker '{symbol.upper()}' was ingested but could not be found in the database."
+                detail=f"Ticker '{symbol.upper()}' not found. Please check the symbol."
             )
 
     return ticker_id
@@ -102,18 +123,26 @@ async def root():
 
 @app.get("/api/v1/ticker/{symbol}/prices", tags=["Price Data"], dependencies=[Depends(verify_api_key)])
 async def get_price_history_endpoint(
-    ticker_id: Annotated[int, Depends(get_ticker_id)],
+    symbol: str,
     days: int = 365
 ) -> list[dict[str, Any]]:
     """Retrieves historical price data for the last N days."""
     if days < 1 or days > 7300:  # Approx. 20 years
         raise HTTPException(
             status_code=400, detail="Days must be between 1 and 7300.")
+    
+    ticker_id = get_ticker_id(symbol)
 
     price_data = fetch_price_history(ticker_id, days)
     if not price_data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="No historical price data found for this ticker.")
+        try:
+            success = ingest_ticker_data(symbol.upper(), 'price', days=days, interval='1d')
+            if success:
+                price_data = fetch_price_history(ticker_id, days)
+        except:
+            pass
+        if not price_data:
+            return []
 
     return price_data
 
@@ -134,7 +163,7 @@ async def get_latest_price_endpoint(
 
 @app.get("/api/v1/ticker/{symbol}/income-statement", tags=["Financials"], dependencies=[Depends(verify_api_key)])
 async def get_income_statement_endpoint(
-    ticker_id: Annotated[int, Depends(get_ticker_id)],
+    symbol: str,
     quarters: int = 4
 ) -> list[dict[str, Any]]:
     """Retrieves the last N quarterly Income Statement reports."""
@@ -142,19 +171,26 @@ async def get_income_statement_endpoint(
     if quarters < 1 or quarters > 12:
         raise HTTPException(
             status_code=400, detail="Quarters must be between 1 and 12.")
+    
+    ticker_id = get_ticker_id(symbol)
 
     data = fetch_financial_statement(ticker_id, 'income_stmt', quarters)
-
     if not data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="No income statement data found.")
+        try:
+            success = ingest_ticker_data(symbol.upper(), 'financials')
+            if success:
+                data = fetch_financial_statement(ticker_id, 'income_stmt', quarters)
+        except:
+            pass
+        if not data:
+            return []
 
     return data
 
 
 @app.get("/api/v1/ticker/{symbol}/balance-sheet", tags=["Financials"], dependencies=[Depends(verify_api_key)])
 async def get_balance_sheet_endpoint(
-    ticker_id: Annotated[int, Depends(get_ticker_id)],
+    symbol: str,
     quarters: int = 4
 ) -> list[dict[str, Any]]:
     """Retrieves the last N quarterly Balance Sheet reports."""
@@ -162,19 +198,26 @@ async def get_balance_sheet_endpoint(
     if quarters < 1 or quarters > 12:
         raise HTTPException(
             status_code=400, detail="Quarters must be between 1 and 12.")
+    
+    ticker_id = get_ticker_id(symbol)
 
     data = fetch_financial_statement(ticker_id, 'balance_sheet', quarters)
-
     if not data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="No balance sheet data found.")
+        try:
+            success = ingest_ticker_data(symbol.upper(), 'financials')
+            if success:
+                data = fetch_financial_statement(ticker_id, 'balance_sheet', quarters)
+        except:
+            pass
+        if not data:
+            return []
 
     return data
 
 
 @app.get("/api/v1/ticker/{symbol}/cash-flow", tags=["Financials"], dependencies=[Depends(verify_api_key)])
 async def get_cash_flow_endpoint(
-    ticker_id: Annotated[int, Depends(get_ticker_id)],
+    symbol: str,
     quarters: int = 4
 ) -> list[dict[str, Any]]:
     """Retrieves the last N quarterly Cash Flow reports."""
@@ -182,15 +225,86 @@ async def get_cash_flow_endpoint(
     if quarters < 1 or quarters > 12:
         raise HTTPException(
             status_code=400, detail="Quarters must be between 1 and 12.")
+    
+    ticker_id = get_ticker_id(symbol)
 
     data = fetch_financial_statement(ticker_id, 'cash_flow', quarters)
-
     if not data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="No cash flow data found.")
+        try:
+            success = ingest_ticker_data(symbol.upper(), 'financials')
+            if success:
+                data = fetch_financial_statement(ticker_id, 'cash_flow', quarters)
+        except:
+            pass
+        if not data:
+            return []
 
     return data
+
+@app.get("/api/v1/ticker/{symbol}/dividends", tags=["Corporate Actions"], dependencies=[Depends(verify_api_key)])
+async def get_dividends_endpoint(
+    symbol: str
+) -> list[dict[str, Any]]:
+    """Retrieves all dividend history for a ticker."""
+    ticker_id = get_ticker_id(symbol)
+    data = fetch_corporate_actions(ticker_id, 'dividend')
+    if not data:
+        try:
+            success = ingest_ticker_data(symbol.upper(), 'dividend')
+            if success:
+                data = fetch_corporate_actions(ticker_id, 'dividend')
+        except:
+            pass
+        if not data:
+            return []
+    return data
+
+
+@app.get("/api/v1/ticker/{symbol}/splits", tags=["Corporate Actions"], dependencies=[Depends(verify_api_key)])
+async def get_splits_endpoint(
+    symbol: str
+) -> list[dict[str, Any]]:
+    """Retrieves all stock split history for a ticker."""
+    ticker_id = get_ticker_id(symbol)
+    data = fetch_corporate_actions(ticker_id, 'split')
+    if not data:
+        try:
+            success = ingest_ticker_data(symbol.upper(), 'split')
+            if success:
+                data = fetch_corporate_actions(ticker_id, 'split')
+        except:
+            pass
+        if not data:
+            return []
+    return data
+
 
 # Note on Corporate Actions:
 # Endpoints for Dividends/Splits will be similar to the above,
 # using a dedicated fetch_corporate_actions function in data_access.py.
+
+@app.get("/api/v1/ticker/{symbol}/news", tags=["News"], dependencies=[Depends(verify_api_key)])
+async def get_stock_news_endpoint(
+    symbol: str,
+    limit: int = 10
+) -> list[dict[str, Any]]:
+    """Retrieves the latest news articles for a ticker."""
+    if limit < 1 or limit > 100:
+        raise HTTPException(
+            status_code=400, detail="Limit must be between 1 and 100.")
+
+    ticker_id = get_ticker_id(symbol)
+    news_data = fetch_stock_news(ticker_id, limit)
+    if not news_data:
+        # Try to fetch and store news data
+        try:
+            success = ingest_ticker_data(symbol.upper(), 'news')
+            if success:
+                news_data = fetch_stock_news(ticker_id, limit)
+        except Exception as e:
+            print(f"Error ingesting news data for {symbol}: {e}")
+        
+        if not news_data:
+            return []  # Return empty array instead of 404
+
+    return news_data

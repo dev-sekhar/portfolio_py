@@ -88,4 +88,86 @@ export const fetchPriceHistory = async (ticker, apiKey, days = 365) => {
         throw error;
     }
 };
-// --- END OF FILE frontend/src/api/financialsApi.js ---
+
+/**
+ * Fetches corporate actions (dividends or splits) for a given ticker.
+ * @param {string} ticker - Stock ticker symbol.
+ * @param {string} actionType - Type of corporate action ('dividends' or 'splits').
+ * @param {string} apiKey - Client's API Key.
+ * @returns {Promise<Array<Object>>} - An array of corporate action records.
+ */
+export const fetchCorporateActions = async (ticker, actionType, apiKey) => {
+    const url = `${API_BASE_URL}/ticker/${ticker}/${actionType}`;
+    
+    const requestOptions = {
+        method: 'GET',
+        headers: {
+            'X-API-Key': apiKey,
+            'Content-Type': 'application/json'
+        }
+    };
+
+    try {
+        const response = await fetch(url, requestOptions);
+
+        if (response.status === 401) {
+            throw new Error("Authentication Failed: Invalid or missing API Key.");
+        }
+        if (response.status === 429) {
+            const error = await response.json();
+            throw new Error(`Rate Limit Exceeded: ${error.detail}`);
+        }
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(`API Error (${response.status}): ${error.detail || 'Failed to fetch data'}`);
+        }
+
+        return await response.json();
+
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        throw error;
+    }
+};
+
+/**
+ * Fetches stock news for a given ticker.
+ * @param {string} ticker - Stock ticker symbol.
+ * @param {string} apiKey - Client's API Key.
+ * @param {number} limit - Number of news articles to retrieve.
+ * @returns {Promise<Array<Object>>} - An array of news articles.
+ */
+export const fetchStockNews = async (ticker, apiKey, limit = 10) => {
+    const url = `${API_BASE_URL}/ticker/${ticker}/news?limit=${limit}`;
+    
+    const requestOptions = {
+        method: 'GET',
+        headers: {
+            'X-API-Key': apiKey,
+            'Content-Type': 'application/json'
+        }
+    };
+
+    try {
+        const response = await fetch(url, requestOptions);
+
+        if (response.status === 401) {
+            throw new Error("Authentication Failed: Invalid or missing API Key.");
+        }
+        if (response.status === 429) {
+            const error = await response.json();
+            throw new Error(`Rate Limit Exceeded: ${error.detail}`);
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(`API Error (${response.status}): ${error.detail || 'Failed to fetch data'}`);
+        }
+
+        return await response.json();
+
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        throw error;
+    }
+};

@@ -1,30 +1,24 @@
 from langchain.tools import BaseTool
 import yfinance as yf
+from typing import List, Dict, Any
 
 class StockNewsTool(BaseTool):
     name: str = "Stock News"
-    description: str = "Useful for fetching the latest news headlines for a given stock symbol."
+    description: str = "Useful for fetching the latest news headlines for a given stock symbol. Returns a list of news articles."
 
-    def _run(self, symbol: str) -> str:
+    def _run(self, symbol: str) -> List[Dict[str, Any]]:
         """Use the tool."""
         try:
             ticker = yf.Ticker(symbol)
             news_items = ticker.news
             if news_items:
-                headlines = []
-                for item in news_items:
-                    if 'content' in item and 'title' in item['content']:
-                        headlines.append(f"- {item['content']['title']}")
-                if headlines:
-                    return f"Latest news for {symbol}:\n" + "\n".join(headlines)
-                else:
-                    return f"No news with titles found for {symbol}."
+                return news_items
             else:
-                return f"Could not retrieve news for {symbol}."
+                return []
         except Exception as e:
-            return f"An error occurred: {e}"
+            print(f"An error occurred: {e}")
+            return []
 
-    async def _arun(self, symbol: str) -> str:
+    async def _arun(self, symbol: str) -> List[Dict[str, Any]]:
         """Use the tool asynchronously."""
-        # This is a placeholder for asynchronous implementation
         return self._run(symbol)

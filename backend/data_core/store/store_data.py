@@ -392,4 +392,88 @@ def ensure_client_usage_table(connection):
 
 
 
+
+
+
+def store_stock_news_mysql(news_data, ticker_symbol):
+    connection = None
+    try:
+        connection = get_db_connection()
+        if not connection:
+            print("Unable to connect to database for stock news storage.")
+            return
+
+        cursor = connection.cursor()
+
+        # Ensure tickers table and get ticker_id
+        cursor.execute("SELECT id FROM tickers WHERE symbol=%s", (ticker_symbol,))
+        row = cursor.fetchone()
+        if not row:
+            print(f"Ticker {ticker_symbol} not found in the database.")
+            return
+        ticker_id = row[0]
+
+        # Ensure stock_news table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS stock_news (
+                uuid VARCHAR(255) PRIMARY KEY,
+                ticker_id INT NOT NULL,
+                title TEXT,
+                publisher VARCHAR(255),
+                link TEXT,
+                provider_publish_time DATETIME,
+                type VARCHAR(50),
+                FOREIGN KEY (ticker_id) REFERENCES tickers(id) ON DELETE CASCADE
+            )
+        """)
+        connection.commit()
+
+        insert_query = """
+            INSERT INTO stock_news (uuid, ticker_id, title, publisher, link, provider_publish_time, type)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                title=VALUES(title),
+                publisher=VALUES(publisher),
+                link=VALUES(link),
+                provider_publish_time=VALUES(provider_publish_time),
+                type=VALUES(type)
+        """
+
+        print(f"[INFO] Inserting/updating {len(news_data)} stock news records...")
+        for item in news_data:
+            # Extract content from nested structure
+            content = item.get('content', {})
+            
+            # Generate uuid from id or create one
+            uuid_val = item.get('id', f"{ticker_symbol}_{hash(content.get('title', ''))}")[:255]
+            
+            # Parse publish date
+            pub_date = content.get('pubDate')
+            publish_time = pd.to_datetime(pub_date) if pub_date else None
+            
+            data_tuple = (
+                uuid_val,
+                ticker_id,
+                content.get('title', ''),
+                content.get('provider', {}).get('displayName', ''),
+                content.get('canonicalUrl', {}).get('url', ''),
+                publish_time,
+                content.get('contentType', '')
+            )
+            try:
+                cursor.execute(insert_query, data_tuple)
+                print(f"Inserted/updated news record: {content.get('title', 'No title')[:50]}...")
+            except Error as e:
+                print(f"MySQL Error inserting stock news: {e}")
+        connection.commit()
+        print("Stock news data committed successfully.")
+
+    except Error as e:
+        print(f"MySQL Error: {e}")
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+            print("MySQL connection closed for stock news.")
+
 # --- END OF UPDATE store_data.py ---

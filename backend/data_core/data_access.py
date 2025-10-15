@@ -105,4 +105,34 @@ def fetch_latest_price(ticker_id: int) -> Union[Dict[str, Any], None]:
 
     return data
 
-# --- END OF FILE backend/data_core/data_access.py ---
+
+def fetch_corporate_actions(ticker_id: int, action_type: str) -> List[Dict[str, Any]]:
+    """Retrieves all corporate actions of a specific type for a given ticker."""
+    query = """
+        SELECT action_date, cash_amount, stock_ratio
+        FROM corporate_actions
+        WHERE ticker_id = %s AND action_type = %s
+        ORDER BY action_date DESC
+    """
+    df = fetch_data_to_dataframe(query, params=(ticker_id, action_type))
+
+    # Convert date to string for JSON serialization
+    df['action_date'] = pd.to_datetime(df['action_date']).dt.strftime('%Y-%m-%d')
+
+    return df.to_dict(orient="records")
+
+def fetch_stock_news(ticker_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    """Retrieves the latest news articles for a given ticker."""
+    query = """
+        SELECT uuid, title, publisher, link, provider_publish_time, type
+        FROM stock_news
+        WHERE ticker_id = %s
+        ORDER BY provider_publish_time DESC
+        LIMIT %s
+    """
+    df = fetch_data_to_dataframe(query, params=(ticker_id, limit))
+
+    # Convert datetime to string for JSON serialization
+    df['provider_publish_time'] = pd.to_datetime(df['provider_publish_time']).dt.strftime('%Y-%m-%d %H:%M:%S')
+
+    return df.to_dict(orient="records")
