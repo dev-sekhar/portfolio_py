@@ -62,3 +62,10 @@ frontend/*.ntvs*
 frontend/*.njsproj
 frontend/*.sln
 frontend/*.sw?
+
+# --- Test files ---
+check_db.py
+debug_news.py
+simple_db_check.py
+test_ingest.py
+test_news_api.py
